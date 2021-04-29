@@ -1,0 +1,95 @@
+---
+title: "Chapter4-2"
+output: html_document
+---
+```{r}
+pm<-function(nie,nde){
+  nie<-exp(nie)
+  nde<-exp(nde)
+  nde*(nie-1) / (nde*nie-1)
+}
+
+```
+$$NDE = exp((\theta_1 + \theta_3 (\beta_0 + \beta_1 a^* +  \theta_2^{'} c + \theta_2 \sigma^2))(a - a^*) + 0.5 \theta_3 ^2 \sigma^2 (a^2 - a^{*2}))$$
+
+$$NIE = exp((\theta_2 \beta_1 + \theta_3 \beta_1 a)(a - a*))$$
+
+$$ \theta_1 = \tilde \theta_1 - \tilde \theta_2(\frac{1}{\lambda}) \beta_1$$
+
+$$\theta_2 = \frac{\tilde \theta_2}{\lambda}$$
+```{r}
+old.nie<-0.3765
+old.nde<-0.0690
+
+old.theta1<-2.402
+old.theta2<-0.01274
+old.theta3<--0.02163
+
+old.beta1<--42.34
+
+lambda<-0.38
+#lambda.old<-14.2^2 / (14.2^2 + 16^2)
+
+new.theta1<-old.theta1 - old.theta2*(1/lambda)*old.beta1
+new.theta2<-old.theta2 / lambda
+new.theta3<-old.theta3 / lambda
+
+#old.nie<-old.theta2*old.beta1+old.theta3*old.beta1
+new.nie<-new.theta2*old.beta1+new.theta3*old.beta1
+new.nde<-old.nie+old.nde - new.nie
+pm(old.nie,old.nde)
+pm(new.nie,new.nde)
+
+```
+
+
+```{r}
+old.nie<-0.2172
+old.nde<-0.1590
+
+old.theta1<-1.80
+old.theta2<-0.01025
+old.theta3<--0.01483
+
+old.beta1<--47.45 
+
+lambda<-0.38
+
+new.theta1<-old.theta1 - old.theta2*(1/lambda)*old.beta1
+new.theta2<-old.theta2 / lambda
+new.theta3<-old.theta3 / lambda
+
+#old.nie<-old.theta2*old.beta1+old.theta3*old.beta1
+new.nie<-new.theta2*old.beta1+new.theta3*old.beta1
+new.nde<-old.nie+old.nde - new.nie
+exp(new.nie)
+exp(new.nde)
+pm(old.nie,old.nde)
+pm(new.nie,new.nde)
+```
+
+
+```{r}
+old.nie<-0.2172
+old.nde<-0.1590
+
+old.theta1<-1.80
+old.theta2<-0.01025
+old.theta3<--0.01483
+
+old.beta1<--47.45 
+
+lambda<-14.2^2 / (14.2^2 + 16^2)
+
+new.theta1<-old.theta1 - old.theta2*(1/lambda)*old.beta1
+new.theta2<-old.theta2 / lambda
+new.theta3<-old.theta3 / lambda
+
+#old.nie<-old.theta2*old.beta1+old.theta3*old.beta1
+new.nie<-new.theta2*old.beta1+new.theta3*old.beta1
+new.nde<-old.nie+old.nde - new.nie
+exp(new.nie)
+exp(new.nde)
+pm(old.nie,old.nde)
+pm(new.nie,new.nde)
+```

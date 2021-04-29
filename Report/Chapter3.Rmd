@@ -1,0 +1,459 @@
+---
+title: "Chapter3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(survival)
+library(DiagrammeR)
+library(regmedint)
+library(ggridges)
+```
+
+# Appendix for Chapter Three
+
+## 3.1 Causal Mediation Analysis
+
+Causal mediation analysis quantifies the extent to which the total effect of an intervention (TE) splits into the effect produced by a known mediator, also called natural indirect effect(NIE), and the effect produced by other means, also known as the natural direct effect(NDE). NDE is the difference between TE and NIE indicates the presence of additional (and potentially novel) mechanisms that connect the intervention to the outcome.
+
+### 3.1.1 Assumption
+
+Causal mediation analysis required sequential ignorability, in parametric form, the assumption could translate to:\n 
+
+1. No hidden exposure-outcome confounding\n
+2. No hidden mediator-outcome confounding\n
+3. No hidden exposure-mediator confounding\n	
+4. No mediator–outcome confounding that is affected by the exposure\n
+
+### 3.1.2 Basic estimation formula in parametric form
+
+Let Y be the outcome variable, A be the treatment, M be the mediator and C be the list of covariates.\n 
+
+$$E (M|A = a,C = c) = \beta_0+\beta_1 a+ \beta_2^{'} c$$
+
+
+$$E (Y |M = m,A = a,C = c) = \theta_0+\theta_1 a+ \theta_2 m + \theta_3 a m + \theta_4^{'} c$$
+And then the direct effect and indirect effect can be written as:
+
+
+$$NDE = (\theta_1 + \theta_3 \beta_0 + \theta_3 \beta_1 a^* + \theta_3 \beta_2^{'} c)(a - a^*)$$
+$$NIE = (\theta_2 \beta_1 + \theta_3 \beta_1 a)(a - a*)$$
+### 3.1.3 Mediation with time-to-event outcome, AFT model
+
+Causal mediation analysis have no problem working with time-to-event outcome. One additional assumption:\n
+
+ 5) Mediator happened before outcome.\n
+
+Compare with proportion hazard (PH) model are biased with common outcome in mediation analysis due to non-collapsibility , accelerated failure time (AFT) model are able to handle both rare and common outcome
+
+When mediator is continuous and the outcomes are time-to-event, parametric model could be written as:\n
+
+$$M =  \beta_0+\beta_1 a+ \beta_2^{'} c + \epsilon$$
+
+And \n
+
+$$log(T) = \theta_0+\theta_1 a+ \theta_2 m + \theta_3 a m + \theta_4^{'} c + v \epsilon$$
+With NDE and NIE\n
+
+$$NDE = exp((\theta_1 + \theta_3 (\beta_0 + \beta_1 a^* +  \theta_2^{'} c + \theta_2 \sigma^2))(a - a^*) + 0.5 \theta_3 ^2 \sigma^2 (a^2 - a^{*2}))$$
+$$NIE = exp((\theta_2 \beta_1 + \theta_3 \beta_1 a)(a - a*))$$
+
+
+## 3.2 Mediation with measurement error
+
+When exposure-mediator interaction term does not exist(le Cessie et al., 2012). Measurement in the mediator can be addressed using the classical measurement error.Let $\tilde M $ be the mediator value measured and M the the true value, and U be the error term with normal distribution centered around zero.
+
+
+Recall, real mediation M and measured mediation $\tilde M$ with measurement error U.\n
+$$\tilde M = M + U, U \sim Normal(0, \sigma_u)$$
+
+Let $\lambda$ be the proportion of the total variance in $\tilde M $ explained by M. 
+
+$$ \lambda = \frac{\sigma_{m|c}^2}{\sigma_{m|c}^2 + \sigma_{u}^2}$$
+
+Estimation of the mediator with invention reminds the same. And estimation of the outcome can be written as:
+
+$$E(Y | A = a, \tilde M = \tilde m, C =c) = \theta_0+\theta_1 a+ \theta_2 \tilde m  + \theta_4^{'} c$$
+
+Parameterized in a AFT model: 
+
+$$log(T) = \tilde \theta_0+ \tilde \theta_1 a+ \tilde \theta_2 \tilde m + \tilde \theta_4^{'} c + v \epsilon$$
+
+
+$$ \theta_1 = \tilde \theta_1 - \tilde \theta_2(\frac{1}{\lambda}) \beta_1$$
+
+$$\theta_2 = \frac{\tilde \theta_2}{\lambda}$$
+
+
+
+
+## 3.3 Mediation with measurement error and truncation
+
+### 3.3.1 Simulation framework
+
+In the situation where measurement error existed in the mediator. When we force a selection either based on the measured mediator or variable that correlated with the mediator, additional bias could be introduced. The term "selection" are referring to the data collection which separate from the data generating process and the term "truncation" are referring to the distribution of data. The two term are interchangeable in high-level. \n
+
+The simulation will emulated data generate with RCT design where treatments are randomly assigned to two balanced group. A selection where baseline measurement above average are enforced. 
+
+
+
+```{r}
+n<-10000
+t<-c(rep(0,n/2),rep(1,n/2))
+beta1<-10
+x0<- rnorm(n,2,2)#uniform will cause difference
+x<-x0+beta1*t
+theta0<-2
+theta1<-3
+theta2<-4
+y<-theta0+theta1*t+theta2*x+rnorm(n,0,1)
+w1<-x0+rnorm(n,0,1)#baseline
+w2<-x+rnorm(n,0,1)#follow-up
+
+d1<-data.frame(y,t,w1,x,x0,label = "truth")
+d2<-data.frame(y,t,w1,x = w2,x0 = x,label = "measured_baseline")
+d<-rbind(d1,d2)
+
+ggplot(data = d)+
+  geom_point(aes(x,y,col = label),alpha = 0.2)+
+  geom_smooth(aes(x,y,col = label),method = "lm",formula = "y~x")+
+  facet_wrap(~t)
+
+
+d.sub<-d%>%filter(w1<2)%>%filter(label=="measured_baseline")
+d.sub$label<-"measured.w/.cutoff"
+
+d<-rbind(d,d.sub)
+ggplot(data = d)+
+  geom_point(aes(x,y,col = label),alpha = 0.2)+
+  geom_smooth(aes(x,y,col = label),method = "lm",formula = "y~x")+
+  facet_wrap(~t)+
+  ggtitle("")
+
+d0.sub<-d.sub%>%filter(t==0)
+
+df<-rbind(data.frame(x = d0.sub$w1,label = "baseline"),
+          data.frame(x = d0.sub$x,label = "follow-up"),
+          data.frame(x = d0.sub$x0,label = "truth"))
+df$label<-as.factor(df$label)
+
+# observed regression toward the mean
+ggplot(data = df)+
+  geom_histogram(aes(x = x,color = label),fill = "white",bins = 50)+
+  ggtitle("Baseline vs follow-up vs trugh with truncation on baseline")
+
+
+# hist(d0.sub$w1)
+# hist(d0.sub$x)
+# hist(d0.sub$x0)
+# var(d0.sub$x)# should be 2
+# var(d0.sub$x0)# use this variance in selected 
+
+```
+
+
+### 3.3.2 Bias and adjustment
+
+```{r}
+true.slope<-NULL
+true.intercept<-NULL
+true.t<-NULL
+
+m.slope<-NULL
+m.intercept<-NULL
+m.t<-NULL
+
+ms.slope<-NULL
+ms.intercept<-NULL
+ms.t<-NULL
+
+sigma2.xs<-NULL
+lambda.est<-NULL
+
+ms.beta1<-NULL
+
+
+for(i in 1:1000){
+  n<-1000
+  t<-c(rep(0,n/2),rep(1,n/2))
+  beta1<-10
+  x0<- rnorm(n,2,2)#uniform will cause difference
+  x<-x0+beta1*t
+  theta0<-2
+  theta1<-3
+  theta2<-4
+  y<-theta0+theta1*t+theta2*x+rnorm(n,0,1)
+  w1<-x0+rnorm(n,0,1)
+  w2<-x+rnorm(n,0,1)
+  
+  d1<-data.frame(y,t,w1,x,x0,label = "truth")
+  d2<-data.frame(y,t,w1,x = w2,x0 = x,label = "measured_baseline")
+  d<-rbind(d1,d2)
+  
+  # ggplot(data = d)+
+  #   geom_point(aes(x,y,col = label),alpha = 0.2)+
+  #   geom_smooth(aes(x,y,col = label),method = "lm",formula = "y~x")+
+  #   facet_wrap(~t)
+  # 
+  
+  d.sub<-d%>%filter(w1<2)%>%filter(label=="measured_baseline")
+  d.sub$label<-"measured.w/.cutoff"
+  
+  d<-rbind(d,d.sub)
+  # ggplot(data = d)+
+  #   geom_point(aes(x,y,col = label),alpha = 0.2)+
+  #   geom_smooth(aes(x,y,col = label),method = "lm",formula = "y~x")+
+  #   facet_wrap(~t)
+  
+  d0.sub<-d.sub%>%filter(t==0)
+
+
+  
+  sigma2.x<-var(d0.sub$x0)
+  sigma2.xs[i]<-sigma2.x
+  sigma2.u<-1
+  
+  
+  lambda.est[i]<-sigma2.x / (sigma2.u + sigma2.x)
+  
+  
+  
+  ## With numbers, cut off play a role
+  fit.m<-lm(x~t,data = d%>%filter(label == "measured.w/.cutoff"))
+  
+  fit1<-lm(y~x+t,data = d%>%filter(label == "truth"))
+  fit2<-lm(y~x+t,data = d%>%filter(label == "measured_baseline"))
+  fit3<-lm(y~x+t,data = d%>%filter(label == "measured.w/.cutoff"))
+  
+  ms.beta1[i]<-fit.m$coefficients[2]
+  
+  true.intercept[i]<-fit1$coefficients[1]
+  true.slope[i]<-fit1$coefficients[2]
+  true.t[i]<-fit1$coefficients[3]
+  
+  m.intercept[i]<-fit2$coefficients[1]
+  m.slope[i]<-fit2$coefficients[2]
+  m.t[i]<-fit2$coefficients[3]
+  
+  
+  ms.intercept[i]<-fit3$coefficients[1]
+  ms.slope[i]<-fit3$coefficients[2]
+  ms.t[i]<-fit3$coefficients[3]
+
+}
+
+sigma2.x<-4
+sigma2.u<-1
+lambda<-sigma2.x / (sigma2.u + sigma2.x) #0.8
+lambda.m<-mean(lambda.est)#~0.6611
+beta1.m<-mean(ms.beta1)
+# lambda.m
+# 4*0.8
+# 4*0.6611
+
+# summary(true.slope)
+# summary(m.slope)
+# summary(ms.slope)
+# 
+# summary(m.intercept)
+# summary(ms.intercept)
+# 
+# summary(true.t)
+# summary(m.t)
+# summary(ms.t)
+
+df<-rbind(data.frame(value = true.slope,label = "truth"),
+          # data.frame(value = m.slope/lambda,label = "adjusted.measured"),
+          # data.frame(value = m.slope,label = "measured "),
+          data.frame(value = ms.slope,label = "truncted measurements"),
+          data.frame(value = ms.slope/lambda,label = "adjusted truncted measurements"),
+          data.frame(value = ms.slope/lambda.m,label = "new adjusted truncted measurements"))
+
+ggplot(data = df)+
+  geom_histogram(aes(x = value,color = label),fill = "white",bins = 100)+
+  ggtitle("New adjustment vs original on theta2")
+
+
+
+df<-rbind(data.frame(value = true.t,label = "truth"),
+          # data.frame(value = m.slope/lambda,label = "adjusted.measured"),
+          # data.frame(value = m.slope,label = "measured "),
+          data.frame(value = ms.t,label = "truncted measurements"),
+          data.frame(value = (ms.t-ms.slope*(1/lambda-1)*beta1.m),label = "adjusted truncted measurements"),
+          data.frame(value = (ms.t-ms.slope*(1/lambda.m-1)*beta1.m),label = "new adjusted truncted measurements"))
+
+ggplot(data = df)+
+  geom_histogram(aes(x = value,color = label),fill = "white",bins = 100)+
+  ggtitle("New adjustment vs original on theta1")
+
+
+
+```
+
+
+
+### 3.4 Covariates dependent with mediator
+
+In the previous formula, we know that when covariates c and m are not independent then
+
+$$\sigma^2_{m}  \ge \sigma^2_{m|c}$$
+
+$$ \lambda = \frac{\sigma_{m|c}^2}{\sigma_{m|c}^2 + \sigma_{u}^2} \le \frac{\sigma_{m}^2}{\sigma_{m}^2 + \sigma_{u}^2} = \lambda^*$$
+
+Therefore, in cases that we are not able estimate $\sigma^2_{m|c} $ directly, we can still conclude an upper bound of the adjustment coefficient $\lambda$ using $\sigma^2_m$. Additionally, we can calculate the direction of reminding bias in $\theta_1$ and $\theta_2$
+
+Since
+
+$$\lambda \le \lambda^* \le 1$$
+Then
+
+$$|\theta_2| \ge   |\theta_2^*|  \ge |\tilde \theta_2|$$
+
+
+### 3.5 Exposure-mediator interaction
+
+Exposure-mediator interactions in the mediation model is important to obtain the unbiased result. However, estimation of coefficient of the interaction term $\theta_3$ using the method based on regression with interaction term is rather difficult, when measurement error exist. There hasn't been any previous literature mentioning the measurement error in mediation analysis with exposure-mediation interaction, as well as truncation on mediator on top of the interaction. 
+
+A short cut approach can be taken using the fact that exposure is categorical, binary in most of the RCT. Data can be stratified into two groups and modeled differently.
+
+Recall (), when exposure-mediator interaction term exist, and the exposure has two level 0 and 1, the regression model on Y can be written as:
+
+$$E (Y |M = m,A = a_0,C = c) = \theta_0+\tilde \theta_1 a+ \tilde \theta_2 m + \tilde \theta_4^{'} c$$
+
+$$E (Y |M = m,A = a_1,C = c) = \tilde \theta_0+\tilde \theta_1 a+ (\tilde \theta_2 + \tilde \theta_3) m + \theta_4^{'} c$$
+
+Then we can use (), to estimate
+
+$$ \lambda = \frac{\sigma_{m|c}^2}{\sigma_{m|c}^2 + \sigma_{u}^2}$$
+
+$$\theta_3 = \frac{(\tilde \theta_2 + \tilde \theta_3)}{\lambda} - \theta_2$$
+
+Similar in 3.4 if covariates and mediator are not independent, $\theta_3$ have the similar direction of bias compare with $\theta_2$ which is biased towards the null. Given $\beta_1$ is unbiased, we can conclude the NIE in equation () is always going to biased towards the null. Further more using the fact NDE is the different between TE and NIE, we are able to correct the propotion of mediation with the proposed method. 
+
+
+
+### 3.6 Degrees of selection, a simulation study. 
+
+Simulations were designed to investigate the direction of the bias of the measurement error in mediator with truncation with the presents of exposure-mediator interaction and the degree of selection on the parameter. Exposure-mediator interaction terms are being considered extensively, where a factorial design is implemented with regard to data generated and the model used. 
+
+Conclusion in() is being confirmed in the simulation, where when measurement error existed in the mediator, higher degree of selection on baseline will result a higher bias for $\theta_2$, $\theta_3$ as well as NIE to be biased towards the null.
+
+Additional, although $\theta_1$ is not being affected unless being modeled without the exposure-mediator interaction term. The NDEs will be affected since selection affected NIE and TE stays the same.  
+
+
+```{r}
+rd30<-fread("v3-0.csv")
+rd31<-fread("v3-1.csv")
+rd32<-fread("v3-2.csv")
+rd33<-fread("v3-3.csv")
+
+rd30$interaction<-NULL
+rd31$interaction<-NULL
+rd32$interaction<-NULL
+rd33$interaction<-NULL
+
+rd30$interaction<-"Data interaction: yes"
+rd31$interaction<-"Data interaction: no"
+rd32$interaction<-"Data interaction: no"
+rd33$interaction<-"Data interaction: yes"
+
+rd30$inter.term<-"Model interaction: no"
+rd31$inter.term<-"Model interaction: no"
+rd32$inter.term<-"Model interaction: yes"
+rd33$inter.term<-"Model interaction: yes"
+
+d35<-rbind(rd30,rd31,rd32,rd33)
+
+#table(d35$interaction)
+
+
+d35$inter.term<-as.factor(d35$inter.term)
+d35$interaction<-as.factor(d35$interaction)
+
+d35$cutoff<-as.factor(d35$cutoff)
+
+levels(d35$cutoff)<-c("q12","q40","q75","q95","q100")
+
+d35$cutoff.n<-as.numeric(d35$cutoff)
+
+ ggplot(data = d35, aes(x = e1.theta1, y = cutoff.n, fill = cutoff)) +
+   geom_density_ridges(alpha = 0.5)+
+  facet_grid(interaction~inter.term)+
+ geom_vline(xintercept = 0,color = "red")+
+  #scale_y_discrete(limit = c(1:5),labels = data$cutoff)+
+  coord_flip()+
+  theme(legend.position = "bottom",axis.text.x = element_blank(),
+        axis.title.x=element_blank())+
+  xlab("theta1")+
+  ggtitle("Theta1")
+ 
+```
+ 
+```{r}
+  ggplot(data = d35, aes(x = e1.theta2, y = cutoff.n, fill = cutoff)) +
+   geom_density_ridges(alpha = 0.5)+
+  facet_grid(interaction~inter.term)+
+ geom_vline(xintercept = -0.015,color = "red")+
+ # scale_y_discrete(limit = c(1:5),labels = data$cutoff)+
+  coord_flip()+
+  theme(legend.position = "bottom",axis.text.x = element_blank(),
+        axis.title.x=element_blank())+
+  xlab("theta2")+
+  ggtitle("theta2")
+```
+
+```{r}
+  ggplot(data = d35, aes(x = e1.theta3, y = cutoff.n, fill = cutoff)) +
+   geom_density_ridges(alpha = 0.5)+
+  facet_grid(interaction~inter.term)+
+ #geom_vline(xintercept = -0.015,color = "red")+
+ # scale_y_discrete(limit = c(1:5),labels = data$cutoff)+
+  coord_flip()+
+  theme(legend.position = "bottom",axis.text.x = element_blank(),
+        axis.title.x=element_blank())+
+  xlab("theta3")+
+  ggtitle("theta3")
+```
+
+```{r}
+  
+   ggplot(data = d35%>%
+            filter(interaction == "Data interaction: yes")%>%
+            filter(inter.term == "Model interaction: yes"),
+          aes(x = e1.theta3, y = cutoff.n, fill = cutoff)) +
+   geom_density_ridges(alpha = 0.5)+
+  facet_grid(interaction~inter.term)+
+ geom_vline(xintercept = 0.015,color = "red")+
+ # scale_y_discrete(limit = c(1:5),labels = data$cutoff)+
+  coord_flip()+
+  theme(legend.position = "bottom",axis.text.x = element_blank(),
+        axis.title.x=element_blank())+
+  xlab("theta3")+
+  ggtitle("Theta3")
+   
+
+```
+
+```{r}
+    ggplot(data = d35%>%
+            filter(interaction == "Data interaction: no")%>%
+            filter(inter.term == "Model interaction: yes"),
+          aes(x = e1.theta3, y = cutoff.n, fill = cutoff)) +
+   geom_density_ridges(alpha = 0.5)+
+  facet_grid(interaction~inter.term)+
+ geom_vline(xintercept = 0,color = "red")+
+#  scale_y_discrete(limit = c(1:5),labels = data$cutoff)+
+  coord_flip()+
+  theme(legend.position = "bottom",axis.text.x = element_blank(),
+        axis.title.x=element_blank())+
+  xlab("theta3")+
+  ggtitle("Theta3")
+
+```
+
+
+
+
